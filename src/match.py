@@ -133,7 +133,7 @@ if __name__=='__main__':
     有多模态（视觉+语言/视觉+音频）算法经验者优先。
     有CV顶会论文（CVPR/ICCV/ECCV）发表或知名开源项目贡献者优先。熟悉Cuda编程或模型底层算子优化者优先。
     """
-    with open('/Users/yiwise/Desktop/Project/Resume-Match/Data/tmracy.json','r',encoding='utf-8') as file:
+    with open('/Data/tmracy.json','r',encoding='utf-8') as file:
         resume_json=json.load(file)
     name='新之星网络科技'
     match=Match(

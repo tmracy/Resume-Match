@@ -100,7 +100,7 @@ class ResearchBackGround:
         return result
 
 if __name__=='__main__':
-    name='杭州一知智能'
+    name='阿里巴巴'
     research=ResearchBackGround(name)
     result=research.extract()
     print(result)
