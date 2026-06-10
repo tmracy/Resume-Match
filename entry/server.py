@@ -88,4 +88,4 @@ if __name__=='__main__':
     app.run(host='0.0.0.0',port=8999,debug=False,use_reloader=False)
 
 
-
+git commit -m "add streamlit demo, requirements and README"
