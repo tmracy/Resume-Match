@@ -1,5 +1,4 @@
 logs
-Prompt
 .env
-Data
+Data/tmracy.json
 __pycache__
