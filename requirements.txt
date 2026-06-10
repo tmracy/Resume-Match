@@ -1,0 +1,24 @@
+# Resume-Match 依赖清单
+# 版本号取自实际运行环境（Python 3.11）实测，可复现安装
+# 安装：pip install -r requirements.txt
+
+# ---- Web 服务 ----
+flask==2.3.1
+werkzeug==2.3.2         # Flask 2.3.1 的实测兼容版本，避免解析到 Werkzeug 3.x
+gunicorn==25.3.0
+
+# ---- LLM 编排（火山方舟 OpenAI 兼容接口）----
+langchain-core==0.3.83
+langchain-openai==0.3.16
+
+# ---- 联网检索 ----
+requests==2.32.3        # Serper(Google) 搜索 HTTP 调用（当前检索主链路）
+tavily-python==0.7.2    # src/search.py 导入时会初始化 Tavily 客户端
+
+# ---- 数据与工具 ----
+pydantic==2.12.5
+python-dotenv==1.1.0
+loguru==0.7.3
+
+# ---- 演示界面 ----
+streamlit==1.45.0

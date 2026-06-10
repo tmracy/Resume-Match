@@ -66,7 +66,7 @@ def search_company():
 
         return Response(
             json.dumps(
-                {'code':1,'info':'success','data':search_result},
+                {'code':0,'info':'success','data':search_result},
                 ensure_ascii=False,
                 indent=3
             ),
@@ -76,7 +76,7 @@ def search_company():
         error=traceback.format_exc()
         return Response(
             json.dumps(
-                {'code':0,'info':'failed','data':error},
+                {'code':1,'info':'failed','data':error},
                 ensure_ascii=False,
                 indent=3
             ),
