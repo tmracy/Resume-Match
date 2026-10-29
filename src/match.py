@@ -89,57 +89,32 @@ class Match:
             except Exception as e:
                 continue
         result['score']=score
+        result['company_background']=json.dumps(self.company_background,ensure_ascii=False)
         logger.info(f'简历匹配的结果为:{result}')
         return result
 
 if __name__=='__main__':
-    job_description="""
-    职位描述
+    def load_data(path):
+        with open(path,'r',encoding='utf-8') as file:
+            data=json.load(file)
+        
+        return data
+    
+    resume_json=load_data('huanghao.json')
+    job_messages=load_data('job_data.json')
+    result=[]
+    #path=os.path.join(root_path,'resume_match.json')
+    for data in job_messages:
+        name=data['name']
+        job_description=data['job']
+        match=Match(name,job_description,resume_json)
+        final=match.main()
+        data.update(final)
+        result.append(data)
 
-    标签：C/C++、机器学习、图像算法、大模型算法、算法工程化经验、强化学习、优秀开源项目经历、模型加速/性能优化、Python
+    
+    with open('match_result.json','w',encoding='utf-8') as file:
+        json.dump(result,file,ensure_ascii=False,indent=3)
 
-    岗位职责
 
-    1. 算法研发：
-    负责计算机视觉相关算法的研发，包括但不限于目标检测、图像分类、语义分割、姿态估计、图像生成等。
-
-    2. 模型独立训练：
-    独立负责模型的数据清洗、增强、训练、调参与评估，根据业务场景（如安防、工业质检、智能硬件）设计并迭代最优算法方案。
-
-    3. 模型优化与部署：
-    针对移动端/边缘端（如手机、嵌入式设备）进行模型压缩、剪枝、量化（INT8/FP16）等加速优化，配合工程团队完成模型转换（如TensorRT、NCNN、TFLite、OpenVINO）及端侧部署。
-
-    4. 前沿技术跟进：
-    跟踪CV领域最新论文与算法，并尝试将其落地到实际产品中。
-
-    任职要求
-
-    1. 学历专业：
-    本科及以上学历（优秀大专亦可），3-5年经验，计算机视觉、模式识别、人工智能、数学等相关专业。
-
-    2. 算法能力：
-    深入理解深度学习理论基础，精通PyTorch或TensorFlow，具备扎实的Python/C++编程功底。
-
-    3. 模型训练经验：
-    必须具备从0到1独立完成模型训练的经验，包括数据预处理、模型选型、超参数调整、损失函数设计以及训练问题（如梯度爆炸/消失、过拟合）的排查解决。
-
-    4. 视觉经验：
-    在以下至少一个方向有深入实践经验：目标检测（YOLO系列、DETR）、图像分割（UNet、SegFormer）、多目标跟踪（SORT/DeepSORT）、图像生成（GAN/VAE/Diffusion Models）。
-
-    5. 部署经验：
-    熟悉模型部署全流程，熟练掌握至少一种推理引擎（TensorRT、ONNX Runtime、TFLite、NCNN），并有实际的上线或落地项目经验。
-
-    加分项：
-    有多模态（视觉+语言/视觉+音频）算法经验者优先。
-    有CV顶会论文（CVPR/ICCV/ECCV）发表或知名开源项目贡献者优先。熟悉Cuda编程或模型底层算子优化者优先。
-    """
-    with open('/Data/tmracy.json','r',encoding='utf-8') as file:
-        resume_json=json.load(file)
-    name='新之星网络科技'
-    match=Match(
-        name,
-        job_description,
-        resume_json
-    )
-    result=match.main()
-    print(result)
+    
