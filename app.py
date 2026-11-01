@@ -199,6 +199,7 @@ with tab_match:
                     "gaps": dims["gaps"],
                     "overall_reason": dims["overall_reason"],
                     "score": score,
+                    "company_background": result["background"],
                 }
             )
 

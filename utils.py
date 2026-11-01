@@ -11,7 +11,7 @@ root_path=os.path.dirname(current_path)
 llm=ChatOpenAI(
     base_url='https://ark.cn-beijing.volces.com/api/v3',
     api_key=os.getenv('API_KEY_DOUBAO'),
-    model='写入自己的推理点id'
+    model='xxxx'
 )
 
 def timeit(name):
