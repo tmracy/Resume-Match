@@ -27,7 +27,7 @@ flowchart LR
     G[简历 JSON] --> E
     H[用户补充说明] --> E
     E --> I["Python 加权聚合<br/>WEIGHTS"]
-    I --> J["score 0-10<br/>+ 亮点 / 差距 / 总评"]
+    I --> J["score 0-10<br/>+ 亮点 / 差距 / 总评<br/>+ 企业背景"]
 ```
 
 ### 设计要点
@@ -60,7 +60,10 @@ Resume-Match/
 │   └── server.py                   # Flask 入口：/healthy /resume/match /search
 ├── src/
 │   ├── search.py                   # 企业背景调研：改写 → Serper 搜索 → LLM 抽取
-│   └── match.py                    # 五维打分 + WEIGHTS 加权聚合
+│   ├── match.py                    # 五维打分 + WEIGHTS 加权聚合
+│   ├── data_process.py             # CSV 职位与 PDF 简历预处理
+│   ├── remuse_analyze.py           # 批量求职决策分析
+│   └── main.py                     # 本地批处理：预处理 → 匹配 → 分析
 ├── Prompt/
 │   ├── rewrite_query.md            # 企业名 → 检索词
 │   ├── extract_company_background.md  # 搜索结果 → 求职者视角的企业背景 JSON
@@ -144,10 +147,21 @@ gunicorn -c gunicorn.py entry.server:app
         "strengths": ["匹配亮点1", "匹配亮点2"],
         "gaps": ["差距或风险1", "差距或风险2"],
         "overall_reason": "综合总评，3-5 句话",
-        "score": 7.55
+        "score": 7.55,
+        "company_background": {
+            "公司简介": "…",
+            "成立时间": "…",
+            "公司规模": "…",
+            "融资出资": "…",
+            "主营业务": "…",
+            "发展阶段": "…",
+            "求职参考点": "…"
+        }
     }
 }
 ```
+
+`company_background` 与 `POST /search` 的 `data` 同结构。抽取失败时，这个字段是说明字符串，不是对象。
 
 失败响应：`{"code": 1, "info": "failed", "data": "<traceback 文本>"}`
 

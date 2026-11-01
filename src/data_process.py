@@ -48,10 +48,8 @@ class Data:
             return None
         return match.group(1).strip()
     
-    def main(self,path,pdf_path):
+    def main(self,path,pdf_path,download_path,download_resume_path):
         data=self.process(path)
-        download_path=os.path.join(root_path,'job_data.json')
-        download_resume_path=os.path.join(root_path,'huanghao.json')
         resume_data=self.pdf_to_text(pdf_path)
         with open(download_path,'w',encoding='utf-8') as file:
             json.dump(data,file,ensure_ascii=False,indent=3)
@@ -62,7 +60,7 @@ class Data:
         logger.info('成功处理好了职位数据和简历数据')
 
 if __name__=='__main__':
-    path='/Users/yiwise/Downloads/招聘信息_10.29.csv'
-    pdf_path='/Users/yiwise/Downloads/黄灏简历新.pdf'
+    path='招聘信息_10.29.csv'
+    pdf_path='简历.pdf'
     data=Data()
     print(data.main(path,pdf_path))

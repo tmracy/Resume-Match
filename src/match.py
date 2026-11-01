@@ -100,7 +100,7 @@ if __name__=='__main__':
         
         return data
     
-    resume_json=load_data('huanghao.json')
+    resume_json=load_data('name.json')
     job_messages=load_data('job_data.json')
     result=[]
     #path=os.path.join(root_path,'resume_match.json')

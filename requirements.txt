@@ -19,6 +19,8 @@ tavily-python==0.7.2    # src/search.py 导入时会初始化 Tavily 客户端
 pydantic==2.12.5
 python-dotenv==1.1.0
 loguru==0.7.3
+pandas==2.3.3           # src/data_process.py、src/main.py 读写表格
+pypdf==6.4.0            # PDF 简历转文本
 
 # ---- 演示界面 ----
 streamlit==1.45.0

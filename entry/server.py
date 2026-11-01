@@ -36,6 +36,12 @@ def resume_match():
             user_input
         )
         match_result=match.main()
+        background=match_result.get('company_background')
+        if isinstance(background,str):
+            try:
+                match_result['company_background']=json.loads(background)
+            except json.JSONDecodeError:
+                pass
 
         return Response(
             json.dumps(

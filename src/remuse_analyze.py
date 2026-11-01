@@ -7,6 +7,7 @@ from utils import (
     timeit
 )
 import json
+from concurrent.futures import ThreadPoolExecutor
 
 analyze_prompt="""
 我会发给你一份已经整理好的求职材料。不要联网搜索，也不要假装搜过。公司事实只能来自下面材料里的企业背景。
@@ -153,18 +154,20 @@ class Analyze:
     def main(self):
         prompt=ChatPromptTemplate.from_template(analyze_prompt)
         chain=prompt | llm
-        result=[]
-        for nums in self.data:
-            response=chain.invoke(
-                {
-                    'data':json.dumps(nums,ensure_ascii=False,indent=3),
-                    'resume':json.dumps(self.resume_data,ensure_ascii=False,indent=3)
-                }
-            ).content
-            nums['final_result']=response
-            result.append(nums)
+
+        def one(nums):
+            nums['final_result'] = chain.invoke({
+                'data': json.dumps(nums, ensure_ascii=False, indent=3),
+                'resume': json.dumps(self.resume_data, ensure_ascii=False, indent=3)
+            }).content
+
+            return nums
+
+        with ThreadPoolExecutor(max_workers=8) as executor:
+            result = list(executor.map(one, self.data))
 
         self.download(self.path,result)
+        return result
 
 if __name__=='__main__':
     def load_json(path):
@@ -172,9 +175,9 @@ if __name__=='__main__':
             data=json.load(file)
         return data
     
-    data=load_json('/Users/yiwise/Desktop/Project/Resume-Match/match_result.json')
-    path='/Users/yiwise/Desktop/Project/Resume-Match/final_job_analyze.json'
-    resume_data=load_json('/Users/yiwise/Desktop/Project/Resume-Match/huanghao.json')
+    data=load_json('match_result.json')
+    path='final_job_analyze.json'
+    resume_data=load_json('name.json')
     analyze=Analyze(data,path,resume_data)
     print(analyze.main())
 
