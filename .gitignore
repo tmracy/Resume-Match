@@ -5,6 +5,5 @@ __pycache__
 .DS_Store
 final_jon_analyze.json
 final_job_analyze.json
-huanghao.json
 job_data.json
 match_result.json
