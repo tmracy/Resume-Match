@@ -5,16 +5,18 @@ Resume-Match —— Streamlit 演示界面
     streamlit run app.py
 
 说明：
-- 本文件只是展示层薄壳，核心逻辑全部复用 src/ 下的真实服务代码：
-    - 企业背景调研  -> src.search.ResearchBackGround （对应 POST /search 接口）
-    - 简历匹配打分  -> src.match.Match               （对应 POST /resume/match 接口）
+- 本文件只是展示层薄壳，核心逻辑复用 src/ 下的真实服务代码。
+- 批量匹配在本文件内完成：上传 CSV + PDF，结果只留在内存里供下载。
+- 企业背景调研 -> src.search.ResearchBackGround （对应 POST /search 接口）
 - 运行前需在项目根目录配置好 .env（API_KEY_DOUBAO / SERPER_API_KEY / Tavily_API_KEY）。
 """
-import json
+import io
 import os
 import sys
 import traceback
+from concurrent.futures import ThreadPoolExecutor
 
+import pandas as pd
 import streamlit as st
 
 # 保证无论从哪个目录启动，src/ utils logger 都能被导入
@@ -25,7 +27,9 @@ if ROOT not in sys.path:
 st.set_page_config(page_title="Resume-Match | 简历匹配 Agent", page_icon="🎯", layout="wide")
 
 try:
+    from src.data_process import Data
     from src.match import Match, WEIGHTS
+    from src.remuse_analyze import Analyze
     from src.search import ResearchBackGround
 except Exception:
     st.error(
@@ -42,16 +46,32 @@ DIM_LABELS = {
     "company_fit": "企业契合",
     "soft_fit": "软性素质",
 }
-STATUS_ICON = {"满足": "✅", "部分满足": "⚠️", "缺失": "❌"}
-SAMPLE_RESUME_PATH = os.path.join(ROOT, "Data", "tmracy.json")
+class MemoryAnalyze(Analyze):
+    """沿用 Analyze.main 的分析流程，但不把结果写到磁盘。"""
 
-RESUME_PLACEHOLDER = """{
-    "基本信息": {"姓名": "张三", "电话": "138****0000", "邮箱": "zhangsan@example.com"},
-    "求职意向": {"目标职位": "AI 算法工程师", "工作经验": "3 年"},
-    "教育背景": {"学历": "本科", "学校": "某大学", "主要课程": "..."},
-    "工作经历": [{"公司名称": "某公司", "职位": "算法工程师", "工作职责": ["..."]}],
-    "技能清单": {"编程语言": {"Python": "熟练掌握"}}
-}"""
+    def download(self, path, data):
+        return
+
+
+def run_uploaded(job_file, resume_file):
+    processor = Data()
+    job_data = processor.process(io.BytesIO(job_file.getvalue()))
+    resume_data = processor.pdf_to_text(io.BytesIO(resume_file.getvalue()))
+
+    def one(data):
+        final = Match(data["name"], data["job"], resume_data).main()
+        data.update(final)
+        return data
+
+    with ThreadPoolExecutor(max_workers=8) as executor:
+        result = list(executor.map(one, job_data))
+    if not result:
+        raise ValueError("职位文件里没有可用岗位")
+
+    analyzed = MemoryAnalyze(result, None, resume_data).main()
+    buffer = io.StringIO()
+    pd.DataFrame(analyzed).to_csv(buffer, index=False)
+    return buffer.getvalue()
 
 
 def render_background(bg):
@@ -63,148 +83,57 @@ def render_background(bg):
         st.warning(str(bg))
 
 
-def read_resume(source, uploaded, pasted):
-    """根据简历来源解析出 dict，返回 (resume_dict, 错误信息)"""
-    try:
-        if source.startswith("🧪"):
-            with open(SAMPLE_RESUME_PATH, "r", encoding="utf-8") as file:
-                return json.load(file), None
-        if source.startswith("📁"):
-            if uploaded is None:
-                return None, "请先上传简历 JSON 文件"
-            return json.load(uploaded), None
-        if not pasted.strip():
-            return None, "请先粘贴简历 JSON 内容"
-        return json.loads(pasted), None
-    except Exception as e:  # JSON 语法错误、非 UTF-8 编码文件等
-        return None, f"简历 JSON 解析失败：{e}"
-
-
 # ---------------- 侧边栏 ----------------
 with st.sidebar:
     st.title("🎯 Resume-Match")
-    st.caption("JD + 企业名称 + 简历 → 联网调研企业背景 → 五维证据打分 → 加权总分（0-10）")
+    st.caption("上传职位 CSV 和简历 PDF，批量匹配并生成求职分析。文件只在内存中处理。")
     st.divider()
 
     st.markdown("**评分权重**（总分 = Σ 子分 × 权重）")
     st.table([{"维度": DIM_LABELS[m.name], "权重": f"{m.value:.0%}"} for m in WEIGHTS])
 
-    st.markdown("**环境变量检查**")
-    for key in ("API_KEY_DOUBAO", "SERPER_API_KEY", "Tavily_API_KEY"):
-        st.markdown(f"{'✅' if os.getenv(key) else '❌'} `{key}`")
-
     st.divider()
-    st.caption("⏱ 完整匹配约 1~3 分钟（联网检索 + 多次 LLM 调用）。\n\n结果由 LLM 生成，仅供求职参考。")
+    st.caption("⏱ 岗位较多时可能需要几十分钟。\n\n结果由 LLM 生成，仅供求职参考。")
 
 # ---------------- 主界面 ----------------
 st.title("简历匹配 Agent")
-tab_match, tab_search = st.tabs(["🎯 简历匹配打分", "🔍 企业背景调研"])
+st.caption("职位 CSV 需要有 JD 列。简历为 PDF。处理过程和下载内容都不写入磁盘。")
+job_file = st.file_uploader("职位 CSV")
+resume_file = st.file_uploader("简历 PDF")
 
-# ============ Tab 1：完整匹配（对应 POST /resume/match） ============
-with tab_match:
-    col_left, col_right = st.columns(2)
-    with col_left:
-        company = st.text_input("企业名称 *", placeholder="例如：阿里巴巴")
-        user_input = st.text_area(
-            "补充说明（可选）",
-            height=150,
-            placeholder="例如：期望薪资 / 到岗时间 / 自我评价等，会进入 soft_fit 维度评估",
-        )
-    with col_right:
-        jd = st.text_area("岗位描述 JD *", height=235, placeholder="粘贴完整的岗位职责与任职要求…")
+if st.button("🚀 开始跑", type="primary", use_container_width=True):
+    if job_file is None:
+        st.error("请上传职位 CSV")
+    elif resume_file is None:
+        st.error("请上传简历 PDF")
+    elif not job_file.name.lower().endswith(".csv"):
+        st.error("职位文件请上传 .csv")
+    elif not resume_file.name.lower().endswith(".pdf"):
+        st.error("简历请上传 .pdf")
+    else:
+        try:
+            with st.status("批量跑批中，岗位较多时可能需要几十分钟，请勿关闭页面…", expanded=True) as status:
+                csv_text = run_uploaded(job_file, resume_file)
+                status.update(label="✅ 跑完了", state="complete", expanded=False)
+            st.session_state["batch_result"] = csv_text
+        except KeyError:
+            st.error("职位 CSV 需要包含 JD 列")
+        except Exception:
+            st.error("跑批失败，错误详情如下（logs/error.log 中也有记录）")
+            st.code(traceback.format_exc())
 
-    resume_options = ["📋 粘贴 JSON", "📁 上传 JSON 文件"]
-    if os.path.exists(SAMPLE_RESUME_PATH):
-        resume_options.append("🧪 使用示例简历（Data/tmracy.json）")
-    resume_source = st.radio("简历来源", resume_options, horizontal=True)
+batch = st.session_state.get("batch_result")
+if batch:
+    st.divider()
+    st.download_button(
+        "下载 CSV",
+        data=batch.encode("utf-8-sig"),
+        file_name="final_job_analyze.csv",
+        mime="text/csv",
+    )
 
-    uploaded_file = None
-    pasted_text = ""
-    if resume_source.startswith("📁"):
-        uploaded_file = st.file_uploader("上传简历 JSON", type=["json"])
-    elif resume_source.startswith("📋"):
-        pasted_text = st.text_area("粘贴简历 JSON", height=220, placeholder=RESUME_PLACEHOLDER)
-
-    if st.button("🚀 开始匹配", type="primary", use_container_width=True):
-        resume_json, err = read_resume(resume_source, uploaded_file, pasted_text)
-        if not company.strip():
-            st.error("请填写企业名称")
-        elif not jd.strip():
-            st.error("请填写岗位描述")
-        elif err:
-            st.error(err)
-        else:
-            try:
-                with st.status("匹配管线运行中，全程约 1~3 分钟，请勿关闭页面…", expanded=True) as status:
-                    st.write("① 企业背景调研：LLM 改写检索词 → Serper 搜索 → LLM 提取背景…")
-                    match = Match(company.strip(), jd, resume_json, user_input.strip() or None)
-                    st.write("② 五维证据打分：LLM 结构化输出中…")
-                    dims = match.process()
-                    status.update(label="✅ 匹配完成", state="complete", expanded=False)
-
-                # 与 src.match.Match.main() 相同的加权逻辑，权重同源于 WEIGHTS
-                score = round(
-                    sum(WEIGHTS[name].value * dims[name].score for name in WEIGHTS.__members__), 2
-                )
-                st.session_state["match_result"] = {
-                    "company": company.strip(),
-                    "background": match.company_background,
-                    "dims": dims,
-                    "score": score,
-                }
-            except Exception:
-                st.error("匹配失败，错误详情如下（logs/error.log 中也有记录）")
-                st.code(traceback.format_exc())
-
-    result = st.session_state.get("match_result")
-    if result:
-        dims, score = result["dims"], result["score"]
-        st.divider()
-        st.subheader(f"匹配报告 — {result['company']}")
-
-        col_metric, col_bar = st.columns([1, 3])
-        col_metric.metric("综合匹配分", f"{score} / 10")
-        col_bar.progress(min(score / 10, 1.0))
-
-        dim_cols = st.columns(5)
-        for col, (name, label) in zip(dim_cols, DIM_LABELS.items()):
-            d = dims[name]
-            col.metric(label, f"{d.score}/10")
-            col.caption(f"{STATUS_ICON.get(d.status, '')} {d.status} · 权重 {WEIGHTS[name].value:.0%}")
-
-        with st.expander("📋 各维度证据与理由", expanded=True):
-            for name, label in DIM_LABELS.items():
-                d = dims[name]
-                st.markdown(f"**{STATUS_ICON.get(d.status, '')} {label}（{d.score}/10，{d.status}）**")
-                st.markdown(f"> 证据：{d.evidence}")
-                st.markdown(f"理由：{d.reason}")
-
-        col_s, col_g = st.columns(2)
-        with col_s:
-            st.markdown("##### ✨ 匹配亮点")
-            for item in dims["strengths"]:
-                st.success(item, icon="✅")
-        with col_g:
-            st.markdown("##### ⚠️ 差距与风险")
-            for item in dims["gaps"]:
-                st.warning(item, icon="⚠️")
-        st.info(f"**综合总评**：{dims['overall_reason']}")
-
-        with st.expander("🏢 企业背景调研结果"):
-            render_background(result["background"])
-        with st.expander("🧾 结果 JSON（与 POST /resume/match 返回的 data 字段同构）"):
-            st.json(
-                {
-                    "strengths": dims["strengths"],
-                    "gaps": dims["gaps"],
-                    "overall_reason": dims["overall_reason"],
-                    "score": score,
-                    "company_background": result["background"],
-                }
-            )
-
-# ============ Tab 2：企业背景调研（对应 POST /search） ============
-with tab_search:
+st.divider()
+with st.expander("企业背景调研"):
     st.caption("独立的企业背景调研：LLM 改写检索词 → Serper 搜索 → LLM 结构化提取，耗时约 30~100 秒。")
     search_company = st.text_input("企业名称", key="search_company", placeholder="例如：阿里巴巴")
 
