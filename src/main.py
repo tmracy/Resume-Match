@@ -6,6 +6,7 @@ import json
 import os
 import pandas as pd
 from concurrent.futures import ThreadPoolExecutor
+import re
 
 class Main:
     def __init__(self,input_job_path,input_resume_path,resume_name:str,job_name:str,job_process_name:str,job_final_name:str):
@@ -50,6 +51,12 @@ class Main:
         else:
             logger.info('职位匹配为空')
         
+    @staticmethod
+    def _greetings(data):
+        match_data =re.search(r"##\s*4\.\s*沟通话术\s*(.*?)\s*##\s*5\.", data, re.S)
+        if not match_data:
+            return None
+        return match_data.group(1).strip()
     
     def analyze(self,final_path):
         self.data_process()
@@ -59,5 +66,6 @@ class Main:
         analyze_data=Analyze(job_process_data,self.job_final_path,resume_data).main()
 
         df=pd.DataFrame(analyze_data)
+        df['打招呼语']=df['final_result'].apply(lambda x:self._greetings(x) or 'error')
         df.to_csv(final_path,index=False)
         logger.info('岗位匹配分析全部完毕')

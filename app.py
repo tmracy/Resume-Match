@@ -28,6 +28,7 @@ st.set_page_config(page_title="Resume-Match | 简历匹配 Agent", page_icon="�
 
 try:
     from src.data_process import Data
+    from src.main import Main
     from src.match import Match, WEIGHTS
     from src.remuse_analyze import Analyze
     from src.search import ResearchBackGround
@@ -69,8 +70,10 @@ def run_uploaded(job_file, resume_file):
         raise ValueError("职位文件里没有可用岗位")
 
     analyzed = MemoryAnalyze(result, None, resume_data).main()
+    df = pd.DataFrame(analyzed)
+    df["打招呼语"] = df["final_result"].apply(lambda x: Main._greetings(x) or "error")
     buffer = io.StringIO()
-    pd.DataFrame(analyzed).to_csv(buffer, index=False)
+    df.to_csv(buffer, index=False)
     return buffer.getvalue()
 
 
